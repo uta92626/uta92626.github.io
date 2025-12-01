@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>フローチャートビルダー </title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        html, body {
+            overscroll-behavior: none;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            font-family: 'Inter', sans-serif;
+        }
+        #flowchartCanvas {
+            cursor: default;
+            touch-action: none; 
+        }
+        .tool-btn.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        /* --- タブのスタイル --- */
+        .tab-item {
+            user-select: none;
+            cursor: pointer;
+            flex-shrink: 0;
+            max-width: 160px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .tab-item.active {
+            background-color: #e5e7eb; /* gray-200 */
+            border-bottom: 2px solid #3b82f6; /* blue-500 */
+            font-weight: bold;
+            color: #1d4ed8;
+        }
+        /* スクロールバー装飾 */
+        #tabsList::-webkit-scrollbar {
+            height: 4px;
+        }
+        #tabsList::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        #tabsList::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 2px;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex h-screen w-screen overflow-hidden flex-col">
+
+    <div id="tabBarContainer" class="w-full h-12 bg-white border-b border-gray-300 flex items-center px-2 shrink-0 z-30 shadow-sm justify-between">
+        
+        <div id="tabsList" class="flex-1 flex overflow-x-auto space-x-1 h-full items-end pb-1 mr-2 min-w-0">
+            </div>
+        
+        <div class="flex items-center space-x-2 shrink-0 bg-white pl-1 border-l border-gray-200 ml-1">
+            
+            <button id="addTabBtn" class="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200 shadow-sm shrink-0 flex items-center justify-center" title="新しいタブを作成">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                <span class="ml-1 text-xs font-bold hidden md:inline">新規タブ</span>
+            </button>
+
+            <button id="helpBtn" class="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors shrink-0" title="ショートカット一覧">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="flex flex-1 overflow-hidden w-full relative">
+        <div id="toolbar" class="w-16 md:w-20 bg-white shadow-lg z-20 flex flex-col items-center py-4 space-y-2 shrink-0 overflow-y-auto h-full border-r border-gray-200">
+            
+            <button id="selectBtn" class="tool-btn active w-12 h-12 md:w-14 md:h-14 p-1 rounded-lg flex flex-col items-center justify-center transition-all duration-150 hover:bg-gray-200" data-tool="select" title="選択 (V)">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 15l-6 6m0 0l-6-6m6 6V9a6 6 0 0112 0v3" />
+                </svg>
+                <span class="text-[10px] mt-0.5 hidden md:block">選択</span>
+            </button>
+
+            <button id="rectBtn" class="tool-btn w-12 h-12 md:w-14 md:h-14 p-1 rounded-lg flex flex-col items-center justify-center transition-all duration-150 hover:bg-gray-200" data-tool="rect" title="四角形 (R)">
+                <div class="w-6 h-4 border-2 border-current"></div>
+                <span class="text-[10px] mt-0.5 hidden md:block">処理</span>
+            </button>
+
+            <button id="diamondBtn" class="tool-btn w-12 h-12 md:w-14 md:h-14 p-1 rounded-lg flex flex-col items-center justify-center transition-all duration-150 hover:bg-gray-200" data-tool="diamond" title="ひし形 (D)">
+                <div class="w-5 h-5 border-2 border-current transform rotate-45 mb-1"></div>
+                <span class="text-[10px] mt-0.5 hidden md:block">分岐</span>
+            </button>
+
+            <button id="ellipseBtn" class="tool-btn w-12 h-12 md:w-14 md:h-14 p-1 rounded-lg flex flex-col items-center justify-center transition-all duration-150 hover:bg-gray-200" data-tool="ellipse" title="楕円 (E)">
+                <div class="w-6 h-4 border-2 border-current rounded-full"></div>
+                <span class="text-[10px] mt-0.5 hidden md:block">端子</span>
+            </button>
+            
+            <button id="waypointBtn" class="tool-btn w-12 h-12 md:w-14 md:h-14 p-1 rounded-lg flex flex-col items-center justify-center transition-all duration-150 hover:bg-gray-200" data-tool="waypoint" title="中継点 (W)">
+                <div class="w-2 h-2 bg-current rounded-full"></div>
+                <span class="text-[10px] mt-0.5 hidden md:block">中継</span>
+            </button>
+
+            <div class="w-8 border-t border-gray-300 my-1"></div>
+
+            <button id="lineBtn" class="tool-btn w-12 h-12 md:w-14 md:h-14 p-1 rounded-lg flex flex-col items-center justify-center transition-all duration-150 hover:bg-gray-200" data-tool="line" title="線 (L)">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6" />
+                </svg>
+                <span class="text-[10px] mt-0.5 hidden md:block">線</span>
+            </button>
+
+            <button id="arrowBtn" class="tool-btn w-12 h-12 md:w-14 md:h-14 p-1 rounded-lg flex flex-col items-center justify-center transition-all duration-150 hover:bg-gray-200" data-tool="arrow" title="矢印 (A)">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+                <span class="text-[10px] mt-0.5 hidden md:block">矢印</span>
+            </button>
+
+            <div class="w-8 border-t border-gray-300 my-1"></div>
+
+            <button id="syncSizeBtn" class="w-12 h-12 md:w-14 md:h-14 p-1 rounded-lg flex flex-col items-center justify-center transition-all duration-150 text-indigo-500 hover:bg-indigo-50" title="サイズ統一">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                </svg>
+                <span class="text-[9px] mt-0.5 hidden md:block whitespace-nowrap">サイズ統一</span>
+            </button>
+
+            <button id="deleteBtn" class="w-12 h-12 md:w-14 md:h-14 p-1 rounded-lg flex flex-col items-center justify-center transition-all duration-150 text-red-500 hover:bg-red-50" title="削除 (Delete)">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span class="text-[10px] mt-0.5 hidden md:block">削除</span>
+            </button>
+            
+            <button id="clearAllBtn" class="w-12 h-12 md:w-14 md:h-14 p-1 rounded-lg flex flex-col items-center justify-center transition-all duration-150 text-red-700 hover:bg-red-100" title="すべて削除">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span class="text-[9px] mt-0.5 hidden md:block whitespace-nowrap">全消去</span>
+            </button>
+
+            <div class="w-8 border-t border-gray-300 my-1"></div>
+
+            <button id="saveBtn" class="w-12 h-12 md:w-14 md:h-14 p-1 rounded-lg flex flex-col items-center justify-center transition-all duration-150 text-green-600 hover:bg-green-50" title="PNGとして保存">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span class="text-[10px] mt-0.5 hidden md:block">保存</span>
+            </button>
+
+            <button id="importBtn" class="w-12 h-12 md:w-14 md:h-14 p-1 rounded-lg flex flex-col items-center justify-center transition-all duration-150 text-purple-600 hover:bg-purple-50" title="画像をインポートして復元">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" transform="rotate(180 12 12)" />
+                </svg>
+                <span class="text-[10px] mt-0.5 hidden md:block">読込</span>
+            </button>
+            <input type="file" id="importInput" class="hidden" accept=".png">
+
+            <div class="mt-auto pb-4 text-[10px] text-gray-400 text-center px-1 hidden md:block">
+                図形を<br>ダブルクリック<br>で編集
+            </div>
+        </div>
+
+        <div id="canvasContainer" class="flex-1 relative bg-gray-200 overflow-hidden w-full h-full">
+            <canvas id="flowchartCanvas"></canvas>
+
+            <div class="absolute bottom-4 right-4 z-10 bg-white rounded-lg shadow-md flex flex-col items-center border border-gray-200">
+                <button id="zoomInBtn" class="w-10 h-10 flex items-center justify-center text-gray-700 hover:bg-gray-100 rounded-t-lg transition-colors" title="拡大 (+)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                </button>
+                <button id="zoomResetBtn" class="w-10 h-8 flex items-center justify-center text-gray-700 hover:bg-gray-100 text-xs font-semibold border-y transition-colors" title="リセット (100%)">
+                    100%
+                </button>
+                <button id="zoomOutBtn" class="w-10 h-10 flex items-center justify-center text-gray-700 hover:bg-gray-100 rounded-b-lg transition-colors" title="縮小 (-)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="textEditorModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-lg font-semibold mb-4 text-gray-800">テキスト編集</h3>
+            <div class="mb-4">
+                <label for="fontSizeInput" class="block text-sm font-medium text-gray-700 mb-1">文字サイズ (px)</label>
+                <div class="flex items-center">
+                    <input type="number" id="fontSizeInput" class="w-24 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value="14" min="8" max="72">
+                </div>
+            </div>
+            <textarea id="textEditorInput" class="w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base" rows="3" placeholder="テキストを入力..."></textarea>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button id="cancelTextEditBtn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors">キャンセル</button>
+                <button id="saveTextEditBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="helpModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-800">キーボードショートカット</h3>
+                <button id="closeHelpBtn" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="space-y-2 text-sm text-gray-700">
+                <div class="flex justify-between border-b pb-1"><span>選択/範囲選択</span><span class="font-mono bg-gray-100 px-2 rounded">V / ドラッグ</span></div>
+                <div class="flex justify-between border-b pb-1"><span>複数選択</span><span class="font-mono bg-gray-100 px-2 rounded">Shift + Click</span></div>
+                <div class="flex justify-between border-b pb-1"><span>全選択</span><span class="font-mono bg-gray-100 px-2 rounded">Ctrl + A</span></div>
+                <div class="flex justify-between border-b pb-1"><span>コピー</span><span class="font-mono bg-gray-100 px-2 rounded">Ctrl + C</span></div>
+                <div class="flex justify-between border-b pb-1"><span>ペースト</span><span class="font-mono bg-gray-100 px-2 rounded">Ctrl + V</span></div>
+                <div class="flex justify-between border-b pb-1"><span>削除</span><span class="font-mono bg-gray-100 px-2 rounded">Delete</span></div>
+                <div class="flex justify-between border-b pb-1"><span>ツール切替</span><span class="font-mono bg-gray-100 px-2 rounded">R, D, E, L, A, W</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- 1. 定数・グローバル変数 ---
+            const canvas = document.getElementById('flowchartCanvas');
+            let ctx = canvas.getContext('2d');
+            const canvasContainer = document.getElementById('canvasContainer');
+
+            // ツールボタン
+            const toolButtons = document.querySelectorAll('.tool-btn');
+            const deleteBtn = document.getElementById('deleteBtn');
+            const clearAllBtn = document.getElementById('clearAllBtn');
+            const saveBtn = document.getElementById('saveBtn');
+            const syncSizeBtn = document.getElementById('syncSizeBtn');
+            // インポート関連
+            const importBtn = document.getElementById('importBtn');
+            const importInput = document.getElementById('importInput');
+
+            // タブ関連
+            const tabsList = document.getElementById('tabsList');
+            const addTabBtn = document.getElementById('addTabBtn');
+            let tabs = [{ id: '1', name: '新規フロー 1', elements: [] }];
+            let activeTabId = '1';
+
+            // モーダル類
+            const textEditorModal = document.getElementById('textEditorModal');
+            const textEditorInput = document.getElementById('textEditorInput');
+            const fontSizeInput = document.getElementById('fontSizeInput');
+            const saveTextEditBtn = document.getElementById('saveTextEditBtn');
+            const cancelTextEditBtn = document.getElementById('cancelTextEditBtn');
+            const helpModal = document.getElementById('helpModal');
+            const helpBtn = document.getElementById('helpBtn');
+            const closeHelpBtn = document.getElementById('closeHelpBtn');
+
+            // ズームボタン
+            const zoomInBtn = document.getElementById('zoomInBtn');
+            const zoomOutBtn = document.getElementById('zoomOutBtn');
+            const zoomResetBtn = document.getElementById('zoomResetBtn');
+
+            // 定数
+            const gridSize = 20;
+            const defaultShapeWidth = 160; 
+            const defaultShapeHeight = 80; 
+            const defaultWaypointSize = 10; 
+            const defaultLineLength = 160; 
+            const resizeHandleSize = 10; 
+            const DATA_SEPARATOR = "\n\n";
+            // 飛び越し描画用の半径
+            const jumpRadius = 6; 
+
+            // アプリの状態
+            let elements = []; 
+            let selectedTool = 'select';
+            
+            // 複数選択用の配列
+            let selectedElements = []; 
+            let editingElement = null; 
+
+            // コピー＆ペースト用
+            let clipboard = [];
+
+            // ドラッグ関連
+            let isDragging = false;
+            let dragStart = { x: 0, y: 0 };
+            let dragStartDims = { x: 0, y: 0, w: 0, h: 0 }; 
+            let draggedHandle = null; 
+            let tempConnector = null; 
+
+            // 範囲選択用
+            let isSelecting = false;
+            let selectionBox = { startX: 0, startY: 0, endX: 0, endY: 0 };
+
+            // パン（画面移動）関連
+            let isPanning = false;
+            let panStart = { x: 0, y: 0 };
+
+            // ズーム関連
+            const transform = {
+                scale: 1,
+                translateX: 0, 
+                translateY: 0
+            };
+            const zoomStep = 0.1;
+            const minZoom = 0.2;
+            const maxZoom = 3.0;
+
+            let lastTapTime = 0;
+            const doubleTapDelay = 300; 
+
+            // --- 2. 初期化処理 ---
+            
+            function initializeCanvas() {
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+                addEventListeners();
+                renderTabs();
+                loadTab(activeTabId);
+                draw();
+            }
+
+            function resizeCanvas() {
+                const dpr = window.devicePixelRatio || 1;
+                canvas.width = canvasContainer.clientWidth * dpr;
+                canvas.height = canvasContainer.clientHeight * dpr;
+                canvas.style.width = `${canvasContainer.clientWidth}px`;
+                canvas.style.height = `${canvasContainer.clientHeight}px`;
+                ctx.scale(dpr, dpr);
+                draw();
+            }
+
+            // --- 3. タブ管理システム ---
+            function renderTabs() {
+                tabsList.innerHTML = '';
+                tabs.forEach((tab) => {
+                    const tabEl = document.createElement('div');
+                    tabEl.className = `tab-item px-4 py-2 flex items-center space-x-2 text-sm whitespace-nowrap border-r border-gray-200 transition-colors ${tab.id === activeTabId ? 'active' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`;
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.textContent = tab.name;
+                    nameSpan.className = "truncate max-w-[120px]";
+                    nameSpan.onclick = () => switchTab(tab.id);
+                    tabEl.appendChild(nameSpan);
+
+                    if (tabs.length > 1) {
+                        const closeBtn = document.createElement('button');
+                        closeBtn.className = "text-gray-400 hover:text-red-500 ml-1 rounded-full w-5 h-5 flex items-center justify-center hover:bg-gray-200";
+                        closeBtn.innerHTML = "&times;";
+                        closeBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            deleteTab(tab.id);
+                        };
+                        tabEl.appendChild(closeBtn);
+                    }
+                    tabsList.appendChild(tabEl);
+                });
+                const activeEl = tabsList.querySelector('.active');
+                if (activeEl) {
+                    activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                }
+            }
+
+            function addTab(initialData = [], name = null) {
+                const newId = Date.now().toString();
+                const newTab = {
+                    id: newId,
+                    name: name || `新規フロー ${tabs.length + 1}`,
+                    elements: initialData 
+                };
+                saveCurrentTab(); 
+                tabs.push(newTab);
+                switchTab(newId);
+            }
+
+            function switchTab(id) {
+                if (activeTabId === id) return;
+                saveCurrentTab(); 
+                activeTabId = id;
+                loadTab(id);
+                renderTabs();
+            }
+
+            function deleteTab(id) {
+                if (tabs.length <= 1) return;
+                const index = tabs.findIndex(t => t.id === id);
+                tabs.splice(index, 1);
+                
+                if (activeTabId === id) {
+                    activeTabId = tabs[Math.max(0, index - 1)].id;
+                    loadTab(activeTabId);
+                }
+                renderTabs();
+            }
+
+            function saveCurrentTab() {
+                const tab = tabs.find(t => t.id === activeTabId);
+                if (tab) {
+                    tab.elements = JSON.parse(JSON.stringify(elements));
+                }
+            }
+
+            function loadTab(id) {
+                const tab = tabs.find(t => t.id === id);
+                if (tab) {
+                    elements = JSON.parse(JSON.stringify(tab.elements));
+                    selectedElements = []; // リセット
+                    draggedHandle = null;
+                    draw();
+                }
+            }
+
+            // --- 4. イベントリスナー ---
+            
+            function addEventListeners() {
+                addTabBtn.addEventListener('click', () => addTab([]));
+                toolButtons.forEach(btn => {
+                    btn.addEventListener('click', () => selectTool(btn.dataset.tool));
+                });
+                deleteBtn.addEventListener('click', deleteSelectedElements); 
+                syncSizeBtn.addEventListener('click', syncAllNodeSizes);
+                
+                clearAllBtn.addEventListener('click', () => {
+                    if (elements.length > 0 && confirm('すべて消去しますか？')) {
+                        elements = [];
+                        selectedElements = [];
+                        saveCurrentTab();
+                        draw();
+                    }
+                });
+
+                helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
+                closeHelpBtn.addEventListener('click', () => helpModal.classList.add('hidden'));
+                helpModal.addEventListener('click', (e) => {
+                    if (e.target === helpModal) helpModal.classList.add('hidden');
+                });
+
+                saveBtn.addEventListener('click', saveImageWithDialog);
+                importBtn.addEventListener('click', () => importInput.click());
+                importInput.addEventListener('change', handleImportFile);
+
+                saveTextEditBtn.addEventListener('click', saveTextEdit);
+                cancelTextEditBtn.addEventListener('click', closeTextEditor);
+
+                document.addEventListener('keydown', handleKeyDown);
+
+                canvas.addEventListener('mousedown', handlePointerDown);
+                canvas.addEventListener('mousemove', handlePointerMove);
+                canvas.addEventListener('mouseup', handlePointerUp);
+                canvas.addEventListener('mouseout', handlePointerOut);
+                canvas.addEventListener('wheel', handleWheel, { passive: false }); 
+                canvas.addEventListener('dblclick', handleDoubleClick);
+
+                canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+                canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+                canvas.addEventListener('touchend', handlePointerUp);
+                canvas.addEventListener('touchcancel', handlePointerOut);
+
+                zoomInBtn.addEventListener('click', () => zoom(1 + zoomStep));
+                zoomOutBtn.addEventListener('click', () => zoom(1 - zoomStep));
+                zoomResetBtn.addEventListener('click', resetZoom);
+            }
+
+            // --- 5. 座標計算・判定 ---
+            function getCanvasPoint(screenX, screenY) {
+                const rect = canvas.getBoundingClientRect();
+                const cssX = screenX - rect.left;
+                const cssY = screenY - rect.top;
+                return {
+                    x: (cssX - transform.translateX) / transform.scale,
+                    y: (cssY - transform.translateY) / transform.scale
+                };
+            }
+
+            function getPointerCoords(e) {
+                let screenX, screenY;
+                if (e.touches && e.touches[0]) {
+                    screenX = e.touches[0].clientX;
+                    screenY = e.touches[0].clientY;
+                } else {
+                    screenX = e.clientX;
+                    screenY = e.clientY;
+                }
+                return { screenX, screenY, ...getCanvasPoint(screenX, screenY) };
+            }
+
+            // --- 6. ポインタイベント ---
+
+            function handlePointerDown(e) {
+                e.preventDefault();
+                const { x, y, screenX, screenY } = getPointerCoords(e);
+                
+                if (e.type === 'touchstart') {
+                    const now = Date.now();
+                    if (now - lastTapTime < doubleTapDelay) {
+                        handleDoubleClick(e);
+                        lastTapTime = 0; return;
+                    }
+                    lastTapTime = now;
+                }
+
+                if (selectedTool === 'select') {
+                    const hitResult = getElementAt(x, y);
+                    
+                    if (hitResult) {
+                        const hitEl = hitResult.element;
+                        const handle = hitResult.handle;
+
+                        // 複数選択のロジック
+                        if (e.shiftKey) {
+                            if (selectedElements.some(el => el.id === hitEl.id)) {
+                                selectedElements = selectedElements.filter(el => el.id !== hitEl.id);
+                                isDragging = false; 
+                            } else {
+                                selectedElements.push(hitEl);
+                                isDragging = true;
+                            }
+                        } else {
+                            if (selectedElements.some(el => el.id === hitEl.id)) {
+                                // グループドラッグ
+                            } else {
+                                selectedElements = [hitEl];
+                            }
+                            isDragging = true;
+                        }
+
+                        draggedHandle = handle; 
+
+                        if (selectedElements.length === 1 && draggedHandle && draggedHandle.startsWith('resize-')) {
+                            const el = selectedElements[0];
+                            dragStartDims = { x: el.x, y: el.y, w: el.width, h: el.height };
+                        }
+                        else if (selectedElements.length === 1 && isShape(selectedElements[0]) && draggedHandle && ['top', 'right', 'bottom', 'left'].includes(draggedHandle)) {
+                            createTemporaryConnector(selectedElements[0], draggedHandle, x, y);
+                            isDragging = true; 
+                        }
+                        
+                        dragStart = { x, y };
+                    } else {
+                        if (!e.shiftKey) {
+                            selectedElements = []; 
+                        }
+                        isSelecting = true;
+                        selectionBox = { startX: x, startY: y, endX: x, endY: y };
+                    }
+                } else {
+                    addElement(x, y);
+                    selectTool('select');
+                }
+                draw();
+            }
+
+            function handlePointerMove(e) {
+                e.preventDefault();
+                const { x, y, screenX, screenY } = getPointerCoords(e);
+
+                if (!isDragging && !isSelecting && !isPanning) {
+                    const hit = getElementAt(x, y);
+                    if (hit) {
+                        if (selectedElements.length === 1 && hit.element === selectedElements[0] && hit.handle && hit.handle.startsWith('resize-')) {
+                            if (hit.handle === 'resize-tl' || hit.handle === 'resize-br') canvas.style.cursor = 'nwse-resize';
+                            else canvas.style.cursor = 'nesw-resize';
+                        } else if (hit.handle && ['top', 'right', 'bottom', 'left'].includes(hit.handle)) {
+                            canvas.style.cursor = 'crosshair';
+                        } else {
+                            canvas.style.cursor = 'move';
+                        }
+                    } else {
+                        canvas.style.cursor = (selectedTool === 'select') ? 'default' : 'crosshair';
+                    }
+                }
+                
+                if (isSelecting) {
+                    selectionBox.endX = x;
+                    selectionBox.endY = y;
+                    draw();
+                    return;
+                }
+
+                if (isPanning) { /* 省略 */ }
+
+                if (!isDragging) return;
+
+                const dx = x - dragStart.x;
+                const dy = y - dragStart.y;
+                
+                if (tempConnector) {
+                    moveTemporaryConnector(x, y);
+                }
+                else if (selectedElements.length === 1 && draggedHandle && draggedHandle.startsWith('resize-')) {
+                    resizeShape(selectedElements[0], x, y, draggedHandle);
+                }
+                else if (selectedElements.length === 1 && draggedHandle === 'text' && isConnector(selectedElements[0])) {
+                    const el = selectedElements[0];
+                    if (!el.textOffset) el.textOffset = { x: 0, y: 0 };
+                    el.textOffset.x += dx;
+                    el.textOffset.y += dy;
+                }
+                else if (selectedElements.length === 1 && draggedHandle && isConnector(selectedElements[0]) && !draggedHandle.startsWith('text')) {
+                    moveConnectorHandle(selectedElements[0], x, y, draggedHandle);
+                } 
+                else if (draggedHandle === null || draggedHandle === 'center' || draggedHandle === 'text') {
+                    selectedElements.forEach(el => {
+                        if (isShape(el)) {
+                            moveShape(el, dx, dy);
+                        } else if (isConnector(el)) {
+                            moveConnector(el, dx, dy);
+                        }
+                    });
+                }
+
+                dragStart = { x, y };
+                draw();
+            }
+            
+            function handlePointerUp(e) {
+                e.preventDefault();
+
+                if (isSelecting) {
+                    finalizeSelection();
+                    isSelecting = false;
+                    draw();
+                    return;
+                }
+
+                if (tempConnector) {
+                    finalizeTemporaryConnector();
+                }
+                
+                if (isDragging) {
+                    if (draggedHandle === null || draggedHandle === 'center') {
+                        selectedElements.forEach(el => {
+                            if (isShape(el) && el.type !== 'waypoint') {
+                                el.x = snapToGrid(el.x);
+                                el.y = snapToGrid(el.y);
+                                updateConnectedConnectors(el.id);
+                            } else if (isConnector(el)) {
+                                if (!el.startElementId) { el.startX = snapToGrid(el.startX); el.startY = snapToGrid(el.startY); }
+                                if (!el.endElementId) { el.endX = snapToGrid(el.endX); el.endY = snapToGrid(el.endY); }
+                                el.waypoints.forEach(wp => { wp.x = snapToGrid(wp.x); wp.y = snapToGrid(wp.y); });
+                            } else if (el.type === 'waypoint') {
+                                el.x = snapToGrid(el.x);
+                                el.y = snapToGrid(el.y);
+                                updateConnectedConnectors(el.id);
+                            }
+                        });
+                    }
+                    else if (selectedElements.length === 1 && draggedHandle && draggedHandle.startsWith('resize-')) {
+                        const el = selectedElements[0];
+                        if (el.width < 0) { el.x += el.width; el.width = Math.abs(el.width); }
+                        if (el.height < 0) { el.y += el.height; el.height = Math.abs(el.height); }
+                        updateConnectedConnectors(el.id);
+                    }
+                }
+                
+                isDragging = false;
+                draggedHandle = null;
+                tempConnector = null; 
+
+                saveCurrentTab();
+                draw();
+            }
+
+            function handlePointerOut(e) {
+                if (isDragging || isSelecting) {
+                    handlePointerUp(e);
+                }
+            }
+
+            function finalizeSelection() {
+                const sx = Math.min(selectionBox.startX, selectionBox.endX);
+                const sy = Math.min(selectionBox.startY, selectionBox.endY);
+                const ex = Math.max(selectionBox.startX, selectionBox.endX);
+                const ey = Math.max(selectionBox.startY, selectionBox.endY);
+
+                const newSelection = [];
+                elements.forEach(el => {
+                    if (isShape(el)) {
+                        const cx = el.x + el.width / 2;
+                        const cy = el.y + el.height / 2;
+                        if (cx >= sx && cx <= ex && cy >= sy && cy <= ey) {
+                            newSelection.push(el);
+                        }
+                    } else if (isConnector(el)) {
+                        const p1In = (el.startX >= sx && el.startX <= ex && el.startY >= sy && el.startY <= ey);
+                        const p2In = (el.endX >= sx && el.endX <= ex && el.endY >= sy && el.endY <= ey);
+                        if (p1In || p2In) {
+                            newSelection.push(el);
+                        }
+                    }
+                });
+                selectedElements = newSelection;
+            }
+
+            function handleDoubleClick(e) {
+                const { x, y } = getPointerCoords(e);
+                const hitResult = getElementAt(x, y);
+                
+                if (hitResult) {
+                    if (hitResult.handle === 'text' || !hitResult.handle) {
+                        openTextEditor(hitResult.element);
+                    }
+                }
+            }
+            
+            function handleWheel(e) {
+                e.preventDefault();
+                if (e.ctrlKey) {
+                    const { screenX, screenY } = getPointerCoords(e);
+                    const zoomFactor = e.deltaY > 0 ? (1 - zoomStep) : (1 + zoomStep);
+                    zoom(zoomFactor, screenX, screenY);
+                } else {
+                    transform.translateX -= e.deltaX;
+                    transform.translateY -= e.deltaY;
+                    draw();
+                }
+            }
+
+            // --- 7. 要素操作 ---
+
+            function selectTool(tool) {
+                if (tool === 'waypoint' && selectedElements.length === 1 && isConnector(selectedElements[0])) {
+                    addWaypointToConnector(selectedElements[0]);
+                    selectTool('select'); return; 
+                }
+                if ((tool === 'arrow' || tool === 'line') && selectedElements.length === 1 && isConnector(selectedElements[0])) {
+                    selectedElements[0].type = tool; 
+                    draw(); selectTool('select'); return;
+                }
+                selectedTool = tool;
+                toolButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tool === tool));
+                canvas.style.cursor = (tool === 'select') ? 'default' : 'crosshair';
+            }
+
+            function addElement(x, y) {
+                const snappedX = snapToGrid(x - defaultShapeWidth / 2);
+                const snappedY = snapToGrid(y - defaultShapeHeight / 2);
+                const id = Date.now().toString();
+                let newElement;
+                const defaultFontSize = 14; 
+
+                switch (selectedTool) {
+                    case 'rect': newElement = { id, type: 'rect', x: snappedX, y: snappedY, width: defaultShapeWidth, height: defaultShapeHeight, text: '処理', fontSize: defaultFontSize }; break;
+                    case 'diamond': newElement = { id, type: 'diamond', x: snappedX, y: snappedY, width: defaultShapeWidth, height: defaultShapeHeight, text: '分岐', fontSize: defaultFontSize }; break;
+                    case 'ellipse': newElement = { id, type: 'ellipse', x: snappedX, y: snappedY, width: defaultShapeWidth, height: defaultShapeHeight, text: '開始/終了', fontSize: defaultFontSize }; break;
+                    case 'waypoint': 
+                        const wpX = snapToGrid(x - defaultWaypointSize / 2); const wpY = snapToGrid(y - defaultWaypointSize / 2);
+                        newElement = { id, type: 'waypoint', x: wpX, y: wpY, width: defaultWaypointSize, height: defaultWaypointSize }; break;
+                    case 'line':
+                    case 'arrow':
+                        newElement = {
+                            id, type: selectedTool, startX: snapToGrid(x), startY: snapToGrid(y), endX: snapToGrid(x) + defaultLineLength, endY: snapToGrid(y),
+                            startElementId: null, endElementId: null, startSnapPoint: null, endSnapPoint: null, waypoints: [], text: '', fontSize: defaultFontSize, textOffset: { x: 0, y: 0 }
+                        }; break;
+                    default: return;
+                }
+                elements.push(newElement);
+                selectedElements = [newElement]; 
+                saveCurrentTab();
+                draw();
+            }
+
+            function addWaypointToConnector(connector) {
+                if (!connector.waypoints) connector.waypoints = [];
+                const points = getConnectorPoints(connector);
+                const segmentIndex = points.length - 2; 
+                const p1 = points[segmentIndex]; const p2 = points[segmentIndex + 1]; 
+                let newWaypoint;
+                if (Math.abs(p1.x - p2.x) < 1) { 
+                    const yDir = Math.sign(p2.y - p1.y); newWaypoint = { x: p2.x, y: p2.y - yDir * gridSize };
+                } else { 
+                    const xDir = Math.sign(p2.x - p1.x); newWaypoint = { x: p2.x - xDir * gridSize, y: p2.y };
+                }
+                connector.waypoints.splice(segmentIndex, 0, newWaypoint);
+                updateOrthogonal(connector);
+                draggedHandle = `waypoint-${segmentIndex}`;
+                saveCurrentTab();
+                draw();
+            }
+
+            function snapToGrid(coord) {
+                return Math.round(coord / gridSize) * gridSize;
+            }
+
+            function syncAllNodeSizes() {
+                if (selectedElements.length !== 1 || !isShape(selectedElements[0]) || selectedElements[0].type === 'waypoint') {
+                    alert("基準となる図形を1つ選択してください。"); return;
+                }
+                const { width, height, id } = selectedElements[0];
+                elements.forEach(el => {
+                    if (isShape(el) && el.id !== id && el.type !== 'waypoint') {
+                        el.width = width; el.height = height; updateConnectedConnectors(el.id);
+                    }
+                });
+                saveCurrentTab(); draw();
+            }
+
+            // --- 8. コピー・ペースト・全選択 ---
+
+            function copySelection() {
+                if (selectedElements.length === 0) return;
+                clipboard = JSON.parse(JSON.stringify(selectedElements));
+            }
+
+            function pasteSelection() {
+                if (clipboard.length === 0) return;
+                
+                const idMap = {};
+                const newElements = [];
+
+                clipboard.forEach(item => {
+                    const newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                    idMap[item.id] = newId;
+                    
+                    const newItem = JSON.parse(JSON.stringify(item));
+                    newItem.id = newId;
+                    
+                    if (isShape(newItem)) {
+                        newItem.x += 20; newItem.y += 20;
+                    } else if (isConnector(newItem)) {
+                        newItem.startX += 20; newItem.startY += 20; newItem.endX += 20; newItem.endY += 20;
+                        newItem.waypoints.forEach(wp => { wp.x += 20; wp.y += 20; });
+                    }
+                    newElements.push(newItem);
+                });
+
+                newElements.forEach(item => {
+                    if (isConnector(item)) {
+                        if (item.startElementId && idMap[item.startElementId]) {
+                            item.startElementId = idMap[item.startElementId];
+                        } 
+                        if (item.endElementId && idMap[item.endElementId]) {
+                            item.endElementId = idMap[item.endElementId];
+                        }
+                    }
+                });
+
+                elements.push(...newElements);
+                selectedElements = newElements;
+                saveCurrentTab();
+                draw();
+            }
+
+            function selectAll() {
+                selectedElements = [...elements];
+                draw();
+            }
+
+            function deleteSelectedElements() {
+                if (selectedElements.length === 0) return;
+                
+                const idsToDelete = new Set(selectedElements.map(el => el.id));
+                elements = elements.filter(el => !idsToDelete.has(el.id));
+                
+                elements.forEach(el => {
+                    if (isConnector(el)) {
+                        if (el.startElementId && idsToDelete.has(el.startElementId)) { el.startElementId = null; el.startSnapPoint = null; }
+                        if (el.endElementId && idsToDelete.has(el.endElementId)) { el.endElementId = null; el.endSnapPoint = null; }
+                    }
+                });
+                
+                selectedElements = [];
+                saveCurrentTab();
+                draw();
+            }
+
+            function handleKeyDown(e) {
+                if (textEditorModal.classList.contains('hidden') && helpModal.classList.contains('hidden')) {
+                    if (e.ctrlKey || e.metaKey) {
+                        if (e.key === 'c' || e.key === 'C') { e.preventDefault(); copySelection(); return; }
+                        if (e.key === 'v' || e.key === 'V') { e.preventDefault(); pasteSelection(); return; }
+                        if (e.key === 'a' || e.key === 'A') { e.preventDefault(); selectAll(); return; }
+                    }
+
+                    if (e.key === 'Delete' || e.key === 'Backspace') {
+                        if (selectedElements.length === 1 && isConnector(selectedElements[0]) && draggedHandle && draggedHandle.startsWith('waypoint-')) {
+                             const index = parseInt(draggedHandle.split('-')[1], 10);
+                             selectedElements[0].waypoints.splice(index, 1);
+                             draggedHandle = null;
+                             updateOrthogonal(selectedElements[0]);
+                             saveCurrentTab(); draw();
+                        } else {
+                            deleteSelectedElements();
+                        }
+                        return;
+                    }
+
+                    switch(e.key.toLowerCase()) {
+                        case 'v': selectTool('select'); break;
+                        case 'r': selectTool('rect'); break;
+                        case 'd': selectTool('diamond'); break;
+                        case 'e': selectTool('ellipse'); break;
+                        case 'w': selectTool('waypoint'); break; 
+                        case 'l': selectTool('line'); break;
+                        case 'a': selectTool('arrow'); break;
+                    }
+                }
+            }
+
+            // --- 9. ヒットテスト ---
+
+            function getElementAt(x, y) {
+                const handleRadius = 8 / transform.scale; 
+
+                if (selectedElements.length === 1) {
+                    const el = selectedElements[0];
+                    if (isShape(el) && el.type !== 'waypoint') {
+                        const r = resizeHandleSize / transform.scale / 2; 
+                        const hitR = Math.max(r, handleRadius); 
+                        if (distance(x, y, el.x, el.y) < hitR) return { element: el, handle: 'resize-tl' };
+                        if (distance(x, y, el.x + el.width, el.y) < hitR) return { element: el, handle: 'resize-tr' };
+                        if (distance(x, y, el.x + el.width, el.y + el.height) < hitR) return { element: el, handle: 'resize-br' };
+                        if (distance(x, y, el.x, el.y + el.height) < hitR) return { element: el, handle: 'resize-bl' };
+                        const snapPoints = getShapeSnapPoints(el);
+                        for (const handleName in snapPoints) {
+                            if (distance(x, y, snapPoints[handleName].x, snapPoints[handleName].y) < handleRadius) return { element: el, handle: handleName };
+                        }
+                    } else if (isConnector(el)) {
+                         if (!el.startElementId && distance(x, y, el.startX, el.startY) < handleRadius) return { element: el, handle: 'start' };
+                         if (!el.endElementId && distance(x, y, el.endX, el.endY) < handleRadius) return { element: el, handle: 'end' };
+                         for(let j=0; j<el.waypoints.length; j++) {
+                             if (distance(x, y, el.waypoints[j].x, el.waypoints[j].y) < handleRadius) return { element: el, handle: `waypoint-${j}` };
+                         }
+                    }
+                }
+
+                for (let i = elements.length - 1; i >= 0; i--) {
+                    const el = elements[i];
+                    
+                    if (isConnector(el)) {
+                        if (el.text) {
+                            const txtPos = getConnectorTextPosition(el);
+                            if (txtPos) {
+                                const fontSize = el.fontSize || 14;
+                                const textW = Math.max(20, el.text.length * fontSize * 0.8);
+                                const textH = fontSize + 10;
+                                if (Math.abs(x - txtPos.x) < textW / 2 + 5 && Math.abs(y - txtPos.y) < textH / 2 + 5) {
+                                    return { element: el, handle: 'text' };
+                                }
+                            }
+                        }
+                        const points = getConnectorPoints(el);
+                        for (let j = 0; j < points.length - 1; j++) {
+                            if (isPointOnLine(x, y, points[j].x, points[j].y, points[j+1].x, points[j+1].y)) return { element: el, handle: null };
+                        }
+                    } else if (isShape(el)) {
+                        if (el.type === 'rect') {
+                            if (x >= el.x && x <= el.x + el.width && y >= el.y && y <= el.y + el.height) return { element: el, handle: null };
+                        } else if (el.type === 'diamond') {
+                            const cx = el.x + el.width / 2; const cy = el.y + el.height / 2;
+                            const tx = Math.abs(x - cx); const ty = Math.abs(y - cy);
+                            if ((tx / (el.width / 2)) + (ty / (el.height / 2)) <= 1) return { element: el, handle: null };
+                        } else if (el.type === 'ellipse') {
+                            const cx = el.x + el.width / 2; const cy = el.y + el.height / 2;
+                            if (Math.pow(x - cx, 2) / Math.pow(el.width/2, 2) + Math.pow(y - cy, 2) / Math.pow(el.height/2, 2) <= 1) return { element: el, handle: null };
+                        } else if (el.type === 'waypoint') {
+                            const cx = el.x + el.width / 2; const cy = el.y + el.height / 2;
+                            if (distance(x, y, cx, cy) < handleRadius) return { element: el, handle: 'center' };
+                        }
+                    }
+                }
+                return null;
+            }
+
+            // --- 10. 描画処理 (飛び越し機能修正版) ---
+
+            function draw(drawGrid = true) {
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0); 
+                ctx.clearRect(0, 0, canvas.width, canvas.height); 
+                ctx.restore();
+                
+                ctx.save();
+                ctx.translate(transform.translateX, transform.translateY);
+                ctx.scale(transform.scale, transform.scale);
+                
+                if (drawGrid) drawBackgroundGrid();
+
+                // 描画準備：全コネクタの線分リストを取得（飛び越し判定用）
+                const allSegs = getAllConnectorSegments();
+
+                elements.forEach(el => {
+                    ctx.save();
+                    const baseLineWidth = 2;
+                    const scaledLineWidth = baseLineWidth / transform.scale; 
+                    
+                    const isSelected = selectedElements.some(sel => sel.id === el.id);
+
+                    if (isSelected) {
+                        ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)'; 
+                        ctx.lineWidth = (baseLineWidth + 1) / transform.scale;
+                        ctx.shadowColor = 'rgba(59, 130, 246, 0.5)'; ctx.shadowBlur = 8 / transform.scale;
+                    } else {
+                        ctx.strokeStyle = '#374151'; ctx.lineWidth = scaledLineWidth;
+                    }
+                    ctx.fillStyle = 'white';
+
+                    if (el.type === 'rect') drawRect(el);
+                    else if (el.type === 'diamond') drawDiamond(el);
+                    else if (el.type === 'ellipse') drawEllipse(el);
+                    else if (el.type === 'waypoint') drawWaypointElement(el, isSelected); 
+                    else if (el.type === 'line') drawLine(el, allSegs); // 飛び越し対応
+                    else if (el.type === 'arrow') drawArrow(el, allSegs); // 矢印も同様
+                    
+                    if (isShape(el) && el.text) drawShapeText(el);
+                    else if (isConnector(el) && el.text) drawConnectorText(el, isSelected); 
+
+                    ctx.restore();
+                });
+                
+                if (selectedElements.length === 1) {
+                    const el = selectedElements[0];
+                    if (isConnector(el)) drawConnectorHandles(el);
+                    if (isShape(el)) {
+                        drawShapeHandles(el);
+                        if (el.type !== 'waypoint') drawResizeHandles(el);
+                    }
+                }
+
+                if (tempConnector) {
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)'; ctx.lineWidth = 2 / transform.scale;
+                    ctx.setLineDash([5 / transform.scale, 5 / transform.scale]); 
+                    if (tempConnector.type === 'arrow') drawArrow(tempConnector, []); else drawLine(tempConnector, []);
+                    ctx.restore();
+                }
+
+                if (isSelecting) {
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
+                    ctx.lineWidth = 1 / transform.scale;
+                    ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+                    const w = selectionBox.endX - selectionBox.startX;
+                    const h = selectionBox.endY - selectionBox.startY;
+                    ctx.fillRect(selectionBox.startX, selectionBox.startY, w, h);
+                    ctx.strokeRect(selectionBox.startX, selectionBox.startY, w, h);
+                    ctx.restore();
+                }
+
+                ctx.restore();
+            }
+
+            /* --- ★修正: 交差点飛び越しロジック (横線のみ) --- */
+            function getAllConnectorSegments() {
+                const segs = [];
+                elements.forEach(el => {
+                    if (isConnector(el)) {
+                        const pts = getConnectorPoints(el);
+                        for (let i = 0; i < pts.length - 1; i++) {
+                            segs.push({
+                                p1: pts[i],
+                                p2: pts[i + 1],
+                                id: el.id
+                            });
+                        }
+                    }
+                });
+                return segs;
+            }
+
+            // 横線(p1-p2)に対して、交差する「縦線」のみを探す
+            function getIntersections(p1, p2, myId, allSegs) {
+                const cuts = [];
+                // 横線であることを前提に呼び出されるため、Yは一定
+                const myY = p1.y;
+                const minX = Math.min(p1.x, p2.x);
+                const maxX = Math.max(p1.x, p2.x);
+
+                allSegs.forEach(seg => {
+                    if (seg.id === myId) return; 
+
+                    // 相手が縦線かどうかチェック
+                    const segIsVertical = Math.abs(seg.p1.x - seg.p2.x) < 0.1;
+                    if (!segIsVertical) return; // 相手も横線なら交差(飛び越し)しない
+
+                    // 縦線: Xは一定
+                    const segX = seg.p1.x;
+                    const segMinY = Math.min(seg.p1.y, seg.p2.y);
+                    const segMaxY = Math.max(seg.p1.y, seg.p2.y);
+
+                    // 交差判定
+                    if (segX > minX && segX < maxX) { // 自分のX範囲内に相手がいる
+                        if (myY > segMinY && myY < segMaxY) { // 相手のY範囲内に自分がいる
+                            cuts.push({ x: segX, y: myY, dist: Math.abs(segX - p1.x) });
+                        }
+                    }
+                });
+                return cuts.sort((a, b) => a.dist - b.dist);
+            }
+
+            function drawSegmentWithJumps(ctx, p1, p2, myId, allSegs) {
+                // 1. 自分が縦線なら、何もせず直線を描いて終了 (飛び越さない)
+                const isVertical = Math.abs(p1.x - p2.x) < 0.1;
+                if (isVertical) {
+                    ctx.lineTo(p2.x, p2.y);
+                    return;
+                }
+
+                // 2. 自分が横線なら、交差する縦線を探す
+                const cuts = getIntersections(p1, p2, myId, allSegs);
+                
+                if (cuts.length === 0) {
+                    ctx.lineTo(p2.x, p2.y);
+                    return;
+                }
+
+                const r = jumpRadius / transform.scale;
+                const sign = Math.sign(p2.x - p1.x); // 右向きなら1, 左向きなら-1
+
+                cuts.forEach(cut => {
+                    // 交差点の手前まで直線を引く
+                    ctx.lineTo(cut.x - r * sign, cut.y);
+                    
+                    // ジャンプ円弧を描く (上側に膨らむ)
+                    // 右向き(sign=1): Start PI(西) -> End 0(東). 上を通るには時計回り(false)?
+                    // Canvas角: 0=右, PI/2=下, PI=左, 3PI/2(or -PI/2)=上
+                    // PI -> 0 を上( -PI/2 )経由で行くには、角度が減る方向(反時計回り=true)ではなく...
+                    // PI -> 2PI (1周) だと下を通る?
+                    // PI -> 0 (反時計) -> PI, PI/2, 0. 下を通る。
+                    // PI -> 0 (時計) -> PI, 3PI/2, 2PI(0). 上を通る。 => false (CW)
+                    
+                    // 左向き(sign=-1): Start 0(東) -> End PI(西).
+                    // 0 -> PI (上を通る) -> 0, -PI/2, -PI. (反時計=true).
+                    
+                    if (sign > 0) {
+                        ctx.arc(cut.x, cut.y, r, Math.PI, 0, false); 
+                    } else {
+                        ctx.arc(cut.x, cut.y, r, 0, Math.PI, true);
+                    }
+                });
+                // 残りの線を引く
+                ctx.lineTo(p2.x, p2.y);
+            }
+
+            function drawLine(el, allSegs) {
+                const points = getConnectorPoints(el);
+                if (points.length < 2) return;
+
+                const segments = allSegs || getAllConnectorSegments();
+
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                
+                for (let i = 0; i < points.length - 1; i++) {
+                    drawSegmentWithJumps(ctx, points[i], points[i+1], el.id, segments);
+                }
+                ctx.stroke();
+            }
+
+            function drawArrow(el, allSegs) {
+                const segments = allSegs || getAllConnectorSegments();
+                drawLine(el, segments); 
+                
+                const points = getConnectorPoints(el);
+                if (points.length < 2) return;
+                const p1 = points[points.length - 2];
+                const p2 = points[points.length - 1];
+                const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                const headLength = 10 / transform.scale;
+                
+                ctx.save();
+                ctx.fillStyle = ctx.strokeStyle; 
+                ctx.beginPath();
+                ctx.moveTo(p2.x, p2.y);
+                ctx.lineTo(p2.x - headLength * Math.cos(angle - Math.PI / 6), p2.y - headLength * Math.sin(angle - Math.PI / 6));
+                ctx.lineTo(p2.x - headLength * Math.cos(angle + Math.PI / 6), p2.y - headLength * Math.sin(angle + Math.PI / 6));
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+
+            function drawBackgroundGrid() {
+                ctx.beginPath(); ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)'; ctx.lineWidth = 1 / transform.scale; 
+                const { x: startX, y: startY } = getCanvasPoint(0, 0); const { x: endX, y: endY } = getCanvasPoint(canvasContainer.clientWidth, canvasContainer.clientHeight);
+                const gridStartX = Math.floor(startX / gridSize) * gridSize; const gridStartY = Math.floor(startY / gridSize) * gridSize;
+                for (let x = gridStartX; x < endX; x += gridSize) { ctx.moveTo(x, startY); ctx.lineTo(x, endY); }
+                for (let y = gridStartY; y < endY; y += gridSize) { ctx.moveTo(startX, y); ctx.lineTo(endX, y); }
+                ctx.stroke();
+            }
+            
+            // 描画関数群
+            function drawRect(el) {
+                ctx.beginPath();
+                ctx.rect(el.x, el.y, el.width, el.height);
+                ctx.fill();
+                ctx.stroke();
+            }
+            function drawDiamond(el) {
+                ctx.beginPath();
+                ctx.moveTo(el.x + el.width / 2, el.y);
+                ctx.lineTo(el.x + el.width, el.y + el.height / 2);
+                ctx.lineTo(el.x + el.width / 2, el.y + el.height);
+                ctx.lineTo(el.x, el.y + el.height / 2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+            function drawEllipse(el) {
+                ctx.beginPath();
+                ctx.ellipse(el.x + el.width / 2, el.y + el.height / 2, el.width / 2, el.height / 2, 0, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            }
+            function drawWaypointElement(el, isSelected) {
+                if (!isSelected) ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.beginPath();
+                ctx.arc(el.x + el.width / 2, el.y + el.height / 2, el.width / 2, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            }
+            function drawShapeText(el) {
+                const fontSize = el.fontSize || 14; 
+                if (fontSize * transform.scale < 4) return; 
+                ctx.fillStyle = '#1f2937'; 
+                ctx.font = `${fontSize}px sans-serif`; 
+                ctx.textAlign = 'center'; 
+                ctx.textBaseline = 'middle';
+                const centerX = el.x + el.width / 2; 
+                const centerY = el.y + el.height / 2; 
+                const maxWidth = el.width - 16; 
+                const lines = el.text ? el.text.split('\n') : []; 
+                const lineHeight = fontSize * 1.2; 
+                const startY = centerY - (lines.length - 1) * lineHeight / 2;
+                lines.forEach((line, index) => ctx.fillText(line, centerX, startY + index * lineHeight, maxWidth));
+            }
+            function drawConnectorText(el, isSelected) {
+                const fontSize = el.fontSize || 14; 
+                if (fontSize * transform.scale < 4 || !el.text) return;
+                const pos = getConnectorTextPosition(el); 
+                if (!pos) return;
+                ctx.fillStyle = '#1f2937'; 
+                ctx.font = `bold ${fontSize}px sans-serif`; 
+                ctx.textAlign = 'center'; 
+                ctx.textBaseline = 'middle';
+                if (isSelected || draggedHandle === 'text') {
+                    const width = ctx.measureText(el.text).width + 8; 
+                    const height = fontSize + 4;
+                    ctx.save(); 
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; 
+                    ctx.fillRect(pos.x - width/2, pos.y - height/2, width, height); 
+                    ctx.restore();
+                }
+                ctx.fillText(el.text, pos.x, pos.y);
+            }
+            function drawConnectorHandles(el) {
+                ctx.save(); 
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.8)'; 
+                ctx.strokeStyle = 'white'; 
+                ctx.lineWidth = 2 / transform.scale;
+                const radius = 6 / transform.scale; 
+                if (!el.startElementId) { 
+                    ctx.beginPath(); ctx.arc(el.startX, el.startY, radius, 0, 2 * Math.PI); ctx.fill(); ctx.stroke(); 
+                }
+                if (!el.endElementId) { 
+                    ctx.beginPath(); ctx.arc(el.endX, el.endY, radius, 0, 2 * Math.PI); ctx.fill(); ctx.stroke(); 
+                }
+                el.waypoints.forEach((wp, index) => {
+                    ctx.beginPath(); ctx.arc(wp.x, wp.y, radius, 0, 2 * Math.PI);
+                    if (draggedHandle === `waypoint-${index}`) ctx.fillStyle = 'rgba(239, 68, 68, 0.8)'; 
+                    else ctx.fillStyle = 'rgba(59, 130, 246, 0.8)'; 
+                    ctx.fill(); ctx.stroke();
+                });
+                ctx.restore();
+            }
+            function drawShapeHandles(el) {
+                ctx.save(); 
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.8)'; 
+                ctx.strokeStyle = 'white'; 
+                ctx.lineWidth = 2 / transform.scale;
+                const radius = 6 / transform.scale; 
+                const snapPoints = getShapeSnapPoints(el);
+                for (const pointName in snapPoints) { 
+                    const point = snapPoints[pointName]; 
+                    ctx.beginPath(); ctx.arc(point.x, point.y, radius, 0, 2 * Math.PI); ctx.fill(); ctx.stroke(); 
+                }
+                ctx.restore();
+            }
+            function drawResizeHandles(el) {
+                ctx.save(); 
+                ctx.fillStyle = 'white'; 
+                ctx.strokeStyle = '#374151'; 
+                ctx.lineWidth = 1 / transform.scale;
+                const size = resizeHandleSize / transform.scale; 
+                const half = size / 2;
+                ctx.fillRect(el.x - half, el.y - half, size, size); ctx.strokeRect(el.x - half, el.y - half, size, size);
+                ctx.fillRect(el.x + el.width - half, el.y - half, size, size); ctx.strokeRect(el.x + el.width - half, el.y - half, size, size);
+                ctx.fillRect(el.x + el.width - half, el.y + el.height - half, size, size); ctx.strokeRect(el.x + el.width - half, el.y + el.height - half, size, size);
+                ctx.fillRect(el.x - half, el.y + el.height - half, size, size); ctx.strokeRect(el.x - half, el.y + el.height - half, size, size);
+                ctx.restore();
+            }
+            
+            // --- 11. ヘルパー関数群 ---
+            function getConnectorTextPosition(el) {
+                const points = getConnectorPoints(el); if (points.length < 2) return null;
+                let midX = (points[0].x + points[1].x) / 2; let midY = (points[0].y + points[1].y) / 2;
+                if (Math.abs(points[0].x - points[1].x) < 1) midX += 8; else midY -= 8;
+                const offsetX = (el.textOffset && el.textOffset.x) ? el.textOffset.x : 0;
+                const offsetY = (el.textOffset && el.textOffset.y) ? el.textOffset.y : 0;
+                return { x: midX + offsetX, y: midY + offsetY };
+            }
+            function getConnectorPoints(connector) {
+                if (!connector) return [];
+                return [{ x: connector.startX, y: connector.startY }, ...connector.waypoints, { x: connector.endX, y: connector.endY }];
+            }
+            function getShapeSnapPoints(shape) {
+                if (!shape || !isShape(shape)) return {};
+                if (shape.type === 'waypoint') return { 'center': { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 } };
+                return {
+                    'top': { x: shape.x + shape.width / 2, y: shape.y },
+                    'right': { x: shape.x + shape.width, y: shape.y + shape.height / 2 },
+                    'bottom': { x: shape.x + shape.width / 2, y: shape.y + shape.height },
+                    'left': { x: shape.x, y: shape.y + shape.height / 2 }
+                };
+            }
+            function isShape(el) { return el && (el.type === 'rect' || el.type === 'diamond' || el.type === 'ellipse' || el.type === 'waypoint'); }
+            function isConnector(el) { return el && (el.type === 'line' || el.type === 'arrow'); }
+            function distance(x1, y1, x2, y2) { return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)); }
+            function isPointOnLine(px, py, x1, y1, x2, y2) {
+                const tolerance = 8 / transform.scale; const len = distance(x1, y1, x2, y2);
+                if (len === 0) return distance(px, py, x1, y1) < tolerance;
+                if (distance(px, py, x1, y1) > len + tolerance || distance(px, py, x2, y2) > len + tolerance) return false;
+                return (Math.abs((y2 - y1) * px - (x2 - x1) * py + x2 * y1 - y2 * x1) / len) < tolerance;
+            }
+            
+            function openTextEditor(element) {
+                editingElement = element;
+                textEditorInput.value = element.text || '';
+                fontSizeInput.value = element.fontSize || 14; 
+                textEditorModal.classList.remove('hidden');
+                textEditorInput.focus();
+            }
+            function closeTextEditor() { editingElement = null; textEditorModal.classList.add('hidden'); }
+            function saveTextEdit() {
+                if (editingElement) {
+                    editingElement.text = textEditorInput.value;
+                    editingElement.fontSize = parseInt(fontSizeInput.value, 10) || 14; 
+                    saveCurrentTab(); closeTextEditor(); draw();
+                }
+            }
+
+            function moveShape(shape, dx, dy) {
+                shape.x += dx; shape.y += dy;
+                updateConnectedConnectors(shape.id);
+            }
+            function moveConnector(connector, dx, dy) {
+                const startNodeSelected = selectedElements.some(el => el.id === connector.startElementId);
+                const endNodeSelected = selectedElements.some(el => el.id === connector.endElementId);
+                if (!startNodeSelected) { connector.startX += dx; connector.startY += dy; }
+                if (!endNodeSelected) { connector.endX += dx; connector.endY += dy; }
+                connector.waypoints.forEach(wp => { wp.x += dx; wp.y += dy; });
+            }
+
+            function updateConnectedConnectors(shapeId) {
+                const shape = elements.find(el => el.id === shapeId); if (!shape) return;
+                const snapPoints = getShapeSnapPoints(shape);
+                elements.forEach(el => {
+                    if (isConnector(el)) {
+                        let u = false;
+                        if (el.startElementId === shapeId && snapPoints[el.startSnapPoint]) {
+                            el.startX = snapPoints[el.startSnapPoint].x; el.startY = snapPoints[el.startSnapPoint].y; u = true;
+                        }
+                        if (el.endElementId === shapeId && snapPoints[el.endSnapPoint]) {
+                            el.endX = snapPoints[el.endSnapPoint].x; el.endY = snapPoints[el.endSnapPoint].y; u = true;
+                        }
+                        if (u) updateOrthogonal(el);
+                    }
+                });
+            }
+
+            function createTemporaryConnector(shape, handle, x, y) {
+                const snapPoints = getShapeSnapPoints(shape);
+                const startPoint = snapPoints[handle];
+                tempConnector = {
+                    id: 'temp', type: 'line', startX: startPoint.x, startY: startPoint.y, endX: x, endY: y,
+                    startElementId: shape.id, startSnapPoint: handle, endElementId: null, endSnapPoint: null,
+                    waypoints: [], text: '', fontSize: 14, textOffset: {x:0, y:0}, isTemporary: true
+                };
+            }
+            function moveTemporaryConnector(x, y) {
+                if (!tempConnector) return;
+                const { snapped, shape, pointName } = findSnapPoint(x, y, tempConnector.startElementId);
+                if (snapped) {
+                    const snapPoints = getShapeSnapPoints(shape);
+                    tempConnector.endX = snapPoints[pointName].x; tempConnector.endY = snapPoints[pointName].y;
+                    tempConnector.endElementId = shape.id; tempConnector.endSnapPoint = pointName;
+                } else {
+                    tempConnector.endX = x; tempConnector.endY = y; tempConnector.endElementId = null; tempConnector.endSnapPoint = null;
+                }
+            }
+            function finalizeTemporaryConnector() {
+                if (!tempConnector) return;
+                if (!tempConnector.endElementId) { tempConnector.endX = snapToGrid(tempConnector.endX); tempConnector.endY = snapToGrid(tempConnector.endY); }
+                const newConnector = { ...tempConnector }; delete newConnector.isTemporary; newConnector.id = Date.now().toString();
+                elements.push(newConnector); tempConnector = null; selectedElements = [newConnector]; saveCurrentTab();
+            }
+            function findSnapPoint(x, y, ignoreShapeId) {
+                const snapDistance = 15; 
+                for (const shape of elements.filter(isShape)) {
+                    if (shape.id === ignoreShapeId) continue; 
+                    const snapPoints = getShapeSnapPoints(shape);
+                    for (const pointName in snapPoints) {
+                        const point = snapPoints[pointName];
+                        if (distance(x, y, point.x, point.y) < snapDistance / transform.scale) return { snapped: true, shape: shape, pointName: pointName };
+                    }
+                }
+                return { snapped: false };
+            }
+            function moveConnectorHandle(connector, x, y, handle) {
+                if (handle.startsWith('waypoint-')) {
+                    const index = parseInt(handle.split('-')[1], 10);
+                    const wp = connector.waypoints[index];
+                    if (wp) { wp.x = x; wp.y = y; snapOrthogonal(connector, index); }
+                    return;
+                }
+                const ignoreShapeId = (handle === 'start') ? connector.endElementId : connector.startElementId;
+                const { snapped, shape, pointName } = findSnapPoint(x, y, ignoreShapeId);
+                if (snapped) {
+                    const snapPoints = getShapeSnapPoints(shape);
+                    if (handle === 'start') {
+                        connector.startX = snapPoints[pointName].x; connector.startY = snapPoints[pointName].y;
+                        connector.startElementId = shape.id; connector.startSnapPoint = pointName;
+                    } else { 
+                        connector.endX = snapPoints[pointName].x; connector.endY = snapPoints[pointName].y;
+                        connector.endElementId = shape.id; connector.endSnapPoint = pointName;
+                    }
+                } else {
+                    if (handle === 'start') { connector.startX = x; connector.startY = y; connector.startElementId = null; connector.startSnapPoint = null; }
+                    else { connector.endX = x; connector.endY = y; connector.endElementId = null; connector.endSnapPoint = null; }
+                }
+                updateOrthogonal(connector);
+            }
+            function snapOrthogonal(connector, draggedIndex) {
+                const points = getConnectorPoints(connector);
+                const p = points[draggedIndex + 1]; if (!p) return; 
+                const pPrev = points[draggedIndex]; const pNext = points[draggedIndex + 2]; 
+                if (pPrev && pNext) {
+                    const dx = Math.abs(p.x - pPrev.x); const dy = Math.abs(p.y - pPrev.y);
+                    if (dx < dy) { p.x = pPrev.x; p.y = pNext.y; } else { p.y = pPrev.y; p.x = pNext.x; }
+                }
+            }
+            function updateOrthogonal(connector) {
+                const points = getConnectorPoints(connector); if (points.length < 2) return;
+                let lastP = points[0]; let lastDir = null; 
+                if (connector.startElementId) lastDir = (connector.startSnapPoint === 'left' || connector.startSnapPoint === 'right') ? 'h' : 'v';
+                for (let i = 1; i < points.length; i++) {
+                    const p = points[i];
+                    if (i === points.length - 1 && connector.endElementId) {
+                        let endDir = (connector.endSnapPoint === 'left' || connector.endSnapPoint === 'right') ? 'h' : 'v';
+                        if (lastDir !== endDir && lastDir !== null) { if (lastDir === 'h') p.x = lastP.x; else p.y = lastP.y; }
+                        break; 
+                    }
+                    if (i < points.length - 1) {
+                        if (lastDir === null) { const dx = Math.abs(p.x - lastP.x); const dy = Math.abs(p.y - lastP.y); lastDir = (dx > dy) ? 'h' : 'v'; }
+                        if (lastDir === 'h') { p.y = lastP.y; lastDir = 'v'; } else { p.x = lastP.x; lastDir = 'h'; }
+                    }
+                    lastP = p;
+                }
+            }
+            function resizeShape(shape, mouseX, mouseY, handle) {
+                const ratio = dragStartDims.w / dragStartDims.h; let newW, newH; const snappedMouseX = snapToGrid(mouseX);
+                if (handle === 'resize-br') { newW = Math.max(gridSize, snappedMouseX - dragStartDims.x); newH = newW / ratio; shape.width = newW; shape.height = newH; }
+                else if (handle === 'resize-bl') { const right = dragStartDims.x + dragStartDims.w; newW = Math.max(gridSize, right - snappedMouseX); newH = newW / ratio; shape.x = right - newW; shape.width = newW; shape.height = newH; }
+                else if (handle === 'resize-tr') { newW = Math.max(gridSize, snappedMouseX - dragStartDims.x); newH = newW / ratio; const bottom = dragStartDims.y + dragStartDims.h; shape.y = bottom - newH; shape.width = newW; shape.height = newH; }
+                else if (handle === 'resize-tl') { const right = dragStartDims.x + dragStartDims.w; newW = Math.max(gridSize, right - snappedMouseX); newH = newW / ratio; const bottom = dragStartDims.y + dragStartDims.h; shape.x = right - newW; shape.y = bottom - newH; shape.width = newW; shape.height = newH; }
+                updateConnectedConnectors(shape.id);
+            }
+            
+            // 共通ヘルパー (zoom/resetZoom)
+            function zoom(factor, screenX, screenY) {
+                const newScale = Math.max(minZoom, Math.min(maxZoom, transform.scale * factor));
+                if (screenX === undefined) { 
+                    const rect = canvas.getBoundingClientRect(); 
+                    screenX = rect.left + rect.width / 2; 
+                    screenY = rect.top + rect.height / 2; 
+                }
+                const worldPoint = getCanvasPoint(screenX, screenY); 
+                transform.scale = newScale;
+                const rect = canvas.getBoundingClientRect(); 
+                const cssX = screenX - rect.left; 
+                const cssY = screenY - rect.top;
+                transform.translateX = cssX - (worldPoint.x * transform.scale); 
+                transform.translateY = cssY - (worldPoint.y * transform.scale);
+                draw();
+            }
+            function resetZoom() { 
+                transform.scale = 1; 
+                transform.translateX = canvasContainer.clientWidth / 2; 
+                transform.translateY = canvasContainer.clientHeight / 2; 
+                draw(); 
+            }
+
+            // 保存・読込関数
+            async function saveImageWithDialog() {
+                if (elements.length === 0) { alert("保存する要素がありません。"); return; }
+                const tempCanvas = createExportCanvas();
+                tempCanvas.toBlob(async (blob) => {
+                    if (!blob) return;
+                    const json = JSON.stringify(elements);
+                    const combinedBlob = new Blob([blob, DATA_SEPARATOR, json], { type: 'image/png' });
+                    if (window.showSaveFilePicker) {
+                        try {
+                            const handle = await window.showSaveFilePicker({ 
+                                suggestedName: 'flowchart.png', 
+                                types: [{ description: 'PNG Image (with data)', accept: { 'image/png': ['.png'] }, }], 
+                            });
+                            const writable = await handle.createWritable(); 
+                            await writable.write(combinedBlob); 
+                            await writable.close();
+                        } catch (err) { 
+                            if (err.name !== 'AbortError') fallbackDownload(combinedBlob); 
+                        }
+                    } else { 
+                        fallbackDownload(combinedBlob); 
+                    }
+                }, 'image/png');
+            }
+            function fallbackDownload(blob) {
+                const fileName = prompt("保存するファイル名を入力してください", "flowchart.png"); 
+                if (!fileName) return;
+                const url = URL.createObjectURL(blob); 
+                const link = document.createElement('a'); 
+                link.download = fileName.endsWith('.png') ? fileName : fileName + '.png'; 
+                link.href = url; 
+                link.click(); 
+                URL.revokeObjectURL(url);
+            }
+            function handleImportFile(e) {
+                const file = e.target.files[0]; 
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    const text = evt.target.result; 
+                    const parts = text.split(DATA_SEPARATOR);
+                    if (parts.length > 1) {
+                        try {
+                            const jsonStr = parts[parts.length - 1]; 
+                            const data = JSON.parse(jsonStr);
+                            addTab(data, file.name.replace('.png', '')); 
+                            alert("復元しました。");
+                        } catch (err) { alert("データ破損"); }
+                    } else { alert("データなし"); }
+                    importInput.value = '';
+                }; 
+                reader.readAsText(file);
+            }
+            
+            // ★復元した保存用キャンバス生成関数★
+            function createExportCanvas() {
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                elements.forEach(el => {
+                    if (isShape(el)) {
+                        minX = Math.min(minX, el.x);
+                        minY = Math.min(minY, el.y);
+                        maxX = Math.max(maxX, el.x + el.width);
+                        maxY = Math.max(maxY, el.y + el.height);
+                    } else if (isConnector(el)) {
+                        const points = getConnectorPoints(el);
+                        points.forEach(p => {
+                            minX = Math.min(minX, p.x);
+                            minY = Math.min(minY, p.y);
+                            maxX = Math.max(maxX, p.x);
+                            maxY = Math.max(maxY, p.y);
+                        });
+                        if (el.text) {
+                            const tp = getConnectorTextPosition(el);
+                            if (tp) {
+                                minX = Math.min(minX, tp.x - 50);
+                                minY = Math.min(minY, tp.y - 20);
+                                maxX = Math.max(maxX, tp.x + 50);
+                                maxY = Math.max(maxY, tp.y + 20);
+                            }
+                        }
+                    }
+                });
+                
+                if (minX === Infinity) { minX = 0; minY = 0; maxX = 0; maxY = 0; }
+
+                const padding = 20;
+                const width = maxX - minX + padding * 2;
+                const height = maxY - minY + padding * 2;
+
+                const tempCanvas = document.createElement('canvas');
+                let tempCtx = tempCanvas.getContext('2d');
+                const dpr = window.devicePixelRatio || 1; 
+
+                tempCanvas.width = width * dpr;
+                tempCanvas.height = height * dpr;
+                tempCtx.scale(dpr, dpr);
+
+                const originalTransform = { ...transform };
+                const originalSelected = selectedElements;
+                
+                transform.scale = 1;
+                transform.translateX = -minX + padding;
+                transform.translateY = -minY + padding;
+                selectedElements = []; // 一時的に選択解除して描画
+
+                const globalCtx = ctx;
+                ctx = tempCtx; 
+                draw(false); 
+                ctx = globalCtx; 
+
+                transform.scale = originalTransform.scale;
+                transform.translateX = originalTransform.translateX;
+                transform.translateY = originalTransform.translateY;
+                selectedElements = originalSelected;
+                
+                return tempCanvas;
+            }
+
+            initializeCanvas();
+        });
+    </script>
+</body>
+</html>
